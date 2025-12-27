@@ -25,14 +25,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
-name = "agalar"
-version = "0.1.0"
-dependencies = [
- "rand",
- "tetra",
-]
-
-[[package]]
 name = "ahash"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -587,6 +579,14 @@ name = "libm"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
+
+[[package]]
+name = "linux_vibecoded_game"
+version = "0.1.0"
+dependencies = [
+ "rand",
+ "tetra",
+]
 
 [[package]]
 name = "log"

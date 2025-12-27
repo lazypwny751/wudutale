@@ -78,7 +78,7 @@ impl ChatSystem {
             messages: vec![
                 ChatMessage { 
                     sender: "System".to_string(), 
-                    content: "Connecting to #agalar-dev...".to_string(), 
+                    content: "Connecting to #vibecoded-dev...".to_string(), 
                     color: Color::rgb(0.5, 0.5, 0.5) 
                 },
                 ChatMessage { 
@@ -138,6 +138,7 @@ struct GameState {
     
     // Boot state
     boot_lines: Vec<String>,
+    boot_text_cache: Vec<Option<(Text, Option<Text>)>>,
     current_line: usize,
     current_char: usize,
     char_timer: f32,
@@ -266,12 +267,13 @@ impl GameState {
             },
         ];
 
-        Ok(GameState {
-            scene: Scene::Boot,
-            font,
-            boot_lines: vec![
-                "Starting version 245.4-1-arch...".to_string(),
-                "/dev/sda1: clean, 245/640 files, 123/245 blocks".to_string(),
+        let boot_lines = vec![
+                "Starting VibeCoded Linux version 6.9.420...".to_string(),
+                "Loading kernel modules...".to_string(),
+                "[  OK  ] Loaded module: vibe_core".to_string(),
+                "[  OK  ] Loaded module: chill_beats".to_string(),
+                "[  OK  ] Loaded module: rgb_lighting".to_string(),
+                "/dev/nvme0n1p2: clean, 420/1337 files, 69/420 blocks".to_string(),
                 "[  OK  ] Started Dispatch Password Requests to Console Directory Watch.".to_string(),
                 "[  OK  ] Reached target Local Encrypted Volumes.".to_string(),
                 "[  OK  ] Reached target Paths.".to_string(),
@@ -293,9 +295,20 @@ impl GameState {
                 "[  OK  ] Started Network Name Resolution.".to_string(),
                 "[  OK  ] Reached target Host and Network Name Lookups.".to_string(),
                 "[  OK  ] Started User Login Management.".to_string(),
-                "Welcome to Agalar Linux 1.0 LTS (tty1)".to_string(),
+                "[  OK  ] Started Vibe Check Service.".to_string(),
+                "[ WARN ] Vibe levels fluctuating slightly.".to_string(),
+                "[  OK  ] Stabilized Vibe Levels.".to_string(),
+                "[  OK  ] Started Graphical Interface.".to_string(),
+                "Welcome to VibeCoded Linux 1.0 LTS (tty1)".to_string(),
                 " ".to_string(),
-            ],
+        ];
+        let boot_text_cache = vec![None; boot_lines.len()];
+
+        Ok(GameState {
+            scene: Scene::Boot,
+            font,
+            boot_lines,
+            boot_text_cache,
             current_line: 0,
             current_char: 0,
             char_timer: 0.0,
@@ -409,7 +422,7 @@ impl State for GameState {
                             if let Some(action) = clicked_action {
                                 match action {
                                     IconAction::OpenMail => {
-                                        self.open_window("Inbox - 1 Unread", "FROM: Unknown\nSUBJECT: SYSTEM CORRUPTION\n\nThe system is under attack. Unknown entities are\ncorrupting the memory blocks.\n\nI have installed a defense protocol 'System_Def'.\nRun it to purge the corruption.\n\nContact 'Glitch' on IRC channel #agalar-dev for more info.", WindowKind::Info);
+                                        self.open_window("Inbox - 1 Unread", "FROM: Unknown\nSUBJECT: SYSTEM CORRUPTION\n\nThe system is under attack. Unknown entities are\ncorrupting the memory blocks.\n\nI have installed a defense protocol 'System_Def'.\nRun it to purge the corruption.\n\nContact 'Glitch' on IRC channel #vibecoded-dev for more info.", WindowKind::Info);
                                         self.mail_read = true;
                                     }
                                     IconAction::StartGame => {
@@ -421,11 +434,11 @@ impl State for GameState {
                                         self.mini_game.bullets.clear();
                                     }
                                     IconAction::OpenTerminal => {
-                                        self.open_window("Terminal", "root@agalar:~# ", WindowKind::Terminal);
+                                        self.open_window("Terminal", "root@vibecoded:~# ", WindowKind::Terminal);
                                         self.terminal_input.clear();
                                     }
                                     IconAction::OpenChat => {
-                                        self.open_window("IRC - #agalar-dev", "", WindowKind::Chat);
+                                        self.open_window("IRC - #vibecoded-dev", "", WindowKind::Chat);
                                     }
                                 }
                             }
@@ -520,7 +533,7 @@ impl State for GameState {
                                     }
                                     WindowKind::Terminal => {
                                         let cmd = self.terminal_input.clone();
-                                        self.terminal_history.push(format!("root@agalar:~# {}", cmd));
+                                        self.terminal_history.push(format!("root@vibecoded:~# {}", cmd));
                                         
                                         if cmd.trim() == "sys_check" {
                                             self.terminal_history.push("Scanning system integrity...".to_string());
@@ -592,36 +605,56 @@ impl State for GameState {
     fn update(&mut self, ctx: &mut Context) -> tetra::Result {
         match self.scene {
             Scene::Boot => {
-                // Typing effect
                 self.char_timer += 1.0; 
-                self.boot_grace_timer += 1.0;
 
-                if self.char_timer > 0.5 { // Faster typing for systemd feel
-                    self.char_timer = 0.0;
-                    if self.current_line < self.boot_lines.len() {
-                        let line = &self.boot_lines[self.current_line];
-                        if self.current_char < line.len() {
-                            // Type multiple chars at once for speed
-                            self.current_char += 3;
-                            if self.current_char > line.len() {
-                                self.current_char = line.len();
-                            }
-                        } else {
+                if self.current_line < self.boot_lines.len() {
+                    // State machine using current_char:
+                    // 0: Init/Start
+                    // 1: Show Text Only
+                    // 2: Show Full (Text + Prefix)
+                    
+                    if self.current_char == 0 {
+                        self.current_char = 1;
+                        self.char_timer = 0.0;
+                    } else if self.current_char == 1 {
+                        // Wait a bit showing only text
+                        if self.char_timer > 2.0 { 
+                            self.current_char = 2;
+                            self.char_timer = 0.0;
+                        }
+                    } else if self.current_char == 2 {
+                        // Wait a bit showing full line before moving on
+                        if self.char_timer > 1.0 {
+                            // Cache the line
+                            let line = &self.boot_lines[self.current_line];
+                            let cached = if line.starts_with("[  OK  ]") {
+                                let ok_part = Text::new("[  OK  ]", self.font.clone());
+                                let rest = Text::new(&line[8..], self.font.clone());
+                                Some((ok_part, Some(rest)))
+                            } else if line.starts_with("[ WARN ]") {
+                                let warn_part = Text::new("[ WARN ]", self.font.clone());
+                                let rest = Text::new(&line[8..], self.font.clone());
+                                Some((warn_part, Some(rest)))
+                            } else if line.starts_with("[ FAILED ]") {
+                                let fail_part = Text::new("[ FAILED ]", self.font.clone());
+                                let rest = Text::new(&line[10..], self.font.clone());
+                                Some((fail_part, Some(rest)))
+                            } else {
+                                let text = Text::new(line, self.font.clone());
+                                Some((text, None))
+                            };
+                            self.boot_text_cache[self.current_line] = cached;
+
                             self.current_line += 1;
                             self.current_char = 0;
-                            self.char_timer = -5.0; // Short pause between lines
-                        }
-                    } else {
-                        self.boot_complete_timer += 1.0;
-                        if self.boot_complete_timer > 60.0 {
-                            self.scene = Scene::LoginUsername;
+                            self.char_timer = 0.0;
                         }
                     }
-                }
-                
-                // Skip boot with Enter, but only after grace period
-                if self.boot_grace_timer > 30.0 && input::is_key_pressed(ctx, Key::Enter) {
-                    self.scene = Scene::LoginUsername;
+                } else {
+                    self.boot_complete_timer += 1.0;
+                    if self.boot_complete_timer > 60.0 {
+                        self.scene = Scene::LoginUsername;
+                    }
                 }
             }
             Scene::LoginUsername | Scene::LoginPassword => {
@@ -817,34 +850,71 @@ impl State for GameState {
                 // Or better, draw from current_line - 25
                 let start_line = if self.current_line > 25 { self.current_line - 25 } else { 0 };
                 
-                for (i, line) in self.boot_lines.iter().enumerate().skip(start_line) {
+                for i in start_line..self.boot_lines.len() {
+                    let line = &self.boot_lines[i];
                     if i < self.current_line {
-                        // Check for [ OK ]
-                        if line.starts_with("[  OK  ]") {
-                            let mut ok_part = Text::new("[  OK  ]", self.font.clone());
-                            ok_part.draw(ctx, DrawParams::new().position(Vec2::new(20.0, y)).color(Color::GREEN));
-                            
-                            let rest = &line[8..];
-                            let mut rest_text = Text::new(rest, self.font.clone());
-                            let ok_width = ok_part.get_bounds(ctx).map(|b| b.width).unwrap_or(0.0);
-                            rest_text.draw(ctx, DrawParams::new().position(Vec2::new(20.0 + ok_width, y)).color(Color::WHITE));
-                        } else {
-                            let mut text = Text::new(line, self.font.clone());
-                            text.draw(ctx, DrawParams::new().position(Vec2::new(20.0, y)).color(Color::WHITE));
+                        // Use cache
+                        if let Some((part1, part2)) = &mut self.boot_text_cache[i] {
+                            if line.starts_with("[  OK  ]") {
+                                part1.draw(ctx, DrawParams::new().position(Vec2::new(20.0, y)).color(Color::GREEN));
+                                if let Some(p2) = part2 {
+                                    let w = part1.get_bounds(ctx).map(|b| b.width).unwrap_or(0.0);
+                                    p2.draw(ctx, DrawParams::new().position(Vec2::new(20.0 + w, y)).color(Color::WHITE));
+                                }
+                            } else if line.starts_with("[ WARN ]") {
+                                part1.draw(ctx, DrawParams::new().position(Vec2::new(20.0, y)).color(Color::rgb(1.0, 0.5, 0.0)));
+                                if let Some(p2) = part2 {
+                                    let w = part1.get_bounds(ctx).map(|b| b.width).unwrap_or(0.0);
+                                    p2.draw(ctx, DrawParams::new().position(Vec2::new(20.0 + w, y)).color(Color::WHITE));
+                                }
+                            } else if line.starts_with("[ FAILED ]") {
+                                part1.draw(ctx, DrawParams::new().position(Vec2::new(20.0, y)).color(Color::RED));
+                                if let Some(p2) = part2 {
+                                    let w = part1.get_bounds(ctx).map(|b| b.width).unwrap_or(0.0);
+                                    p2.draw(ctx, DrawParams::new().position(Vec2::new(20.0 + w, y)).color(Color::WHITE));
+                                }
+                            } else {
+                                part1.draw(ctx, DrawParams::new().position(Vec2::new(20.0, y)).color(Color::WHITE));
+                            }
                         }
                     } else if i == self.current_line {
-                        let sub = &line[0..self.current_char];
-                        // Simple drawing for current line, no color parsing for partial line to keep it simple
-                        let mut text = Text::new(sub, self.font.clone());
-                        // Actually if it starts with [ OK ] we want the OK green and rest white, but for typing effect simple is okay
-                        // Let's just make it white while typing
-                        text.draw(ctx, DrawParams::new().position(Vec2::new(20.0, y)).color(Color::WHITE));
-                        
-                        // Draw cursor
-                        if (self.char_timer as i32 / 5) % 2 == 0 {
-                             let mut cursor = Text::new("_", self.font.clone());
-                             let width = text.get_bounds(ctx).map(|b| b.width).unwrap_or(0.0);
-                             cursor.draw(ctx, DrawParams::new().position(Vec2::new(20.0 + width, y)).color(Color::WHITE));
+                        // Determine parts
+                        let (prefix_str, prefix_color, text_content) = if line.starts_with("[  OK  ]") {
+                            (Some("[  OK  ]"), Some(Color::GREEN), &line[8..])
+                        } else if line.starts_with("[ WARN ]") {
+                            (Some("[ WARN ]"), Some(Color::rgb(1.0, 0.5, 0.0)), &line[8..])
+                        } else if line.starts_with("[ FAILED ]") {
+                            (Some("[ FAILED ]"), Some(Color::RED), &line[10..])
+                        } else {
+                            (None, None, line.as_str())
+                        };
+
+                        if self.current_char == 1 {
+                            // Show text only, indented
+                            let indent = if prefix_str.is_some() {
+                                // Approx width of "[  OK  ]" (8 chars) * char width (approx 10px?)
+                                // Better to measure a dummy text
+                                let mut dummy = Text::new("[  OK  ]", self.font.clone());
+                                dummy.get_bounds(ctx).map(|b| b.width).unwrap_or(80.0)
+                            } else {
+                                0.0
+                            };
+                            
+                            let mut t = Text::new(text_content, self.font.clone());
+                            t.draw(ctx, DrawParams::new().position(Vec2::new(20.0 + indent, y)).color(Color::WHITE));
+                        } else if self.current_char == 2 {
+                            // Show full
+                            if let (Some(p_str), Some(p_col)) = (prefix_str, prefix_color) {
+                                let mut p_text = Text::new(p_str, self.font.clone());
+                                p_text.draw(ctx, DrawParams::new().position(Vec2::new(20.0, y)).color(p_col));
+                                
+                                let w = p_text.get_bounds(ctx).map(|b| b.width).unwrap_or(0.0);
+                                let mut t = Text::new(text_content, self.font.clone());
+                                t.draw(ctx, DrawParams::new().position(Vec2::new(20.0 + w, y)).color(Color::WHITE));
+                            } else {
+                                let mut t = Text::new(text_content, self.font.clone());
+                                t.draw(ctx, DrawParams::new().position(Vec2::new(20.0, y)).color(Color::WHITE));
+                            }
                         }
                     }
                     y += 20.0;
@@ -853,8 +923,8 @@ impl State for GameState {
             Scene::LoginUsername | Scene::LoginPassword => {
                 let mut y = 20.0;
                 
-                // Draw "agalar login: "
-                let login_prompt = "agalar login: ";
+                // Draw "vibecoded login: "
+                let login_prompt = "user login: ";
                 let mut prompt_text = Text::new(login_prompt, self.font.clone());
                 prompt_text.draw(ctx, DrawParams::new().position(Vec2::new(20.0, y)).color(Color::WHITE));
                 
@@ -907,7 +977,7 @@ impl State for GameState {
 
                 // Draw Login Prompt (Static history)
                 let mut y = 20.0;
-                let mut login_text = Text::new("agalar login: root", self.font.clone());
+                let mut login_text = Text::new("user login: root", self.font.clone());
                 login_text.draw(ctx, DrawParams::new().position(Vec2::new(20.0, y)).color(Color::WHITE));
                 
                 y += 24.0;
@@ -1035,7 +1105,7 @@ impl State for GameState {
                                     }
                                     
                                     // Draw Input Line
-                                    let input_display = format!("root@agalar:~# {}_", self.terminal_input);
+                                    let input_display = format!("root@vibecoded:~# {}_", self.terminal_input);
                                     let mut input_text = Text::new(input_display, self.font.clone());
                                     input_text.draw(ctx, DrawParams::new().position(Vec2::new(win.rect.x + 10.0, win.rect.y + y_offset)).color(Color::WHITE));
                                 }
@@ -1065,7 +1135,7 @@ impl State for GameState {
                 title.draw(ctx, DrawParams::new().position(Vec2::new(300.0, 120.0)).color(Color::BLACK));
                 
                 let mut content = Text::new(
-                    "Hostname: agalar\nKernel: 5.10.0-agalar\nMemory: 245KB\n\n[ OK ] Save & Exit", 
+                    "Hostname: vibecoded\nKernel: 6.9.420-vibecoded\nMemory: 64MB\n\n[ OK ] Save & Exit", 
                     self.font.clone()
                 );
                 content.draw(ctx, DrawParams::new().position(Vec2::new(150.0, 180.0)).color(Color::BLACK));
@@ -1077,7 +1147,7 @@ impl State for GameState {
 }
 
 fn main() -> tetra::Result {
-    ContextBuilder::new("Agalar Linux Boot", SCREEN_WIDTH, SCREEN_HEIGHT)
+    ContextBuilder::new("Linux VibeCoded Game", SCREEN_WIDTH, SCREEN_HEIGHT)
         .quit_on_escape(true)
         .build()?
         .run(GameState::new)
