@@ -132,9 +132,16 @@ enum Scene {
     Config,
 }
 
+#[derive(PartialEq, Clone, Copy)]
+enum Language {
+    English,
+    Turkish,
+}
+
 struct GameState {
     scene: Scene,
     font: Font,
+    language: Language,
     
     // Boot state
     boot_lines: Vec<String>,
@@ -146,13 +153,18 @@ struct GameState {
     
     // Transition
     transition_timer: f32,
+    session_started: bool,
     
     // Login/Menu state
     input_buffer: String,
     login_error: Option<String>,
     
-    menu_options: Vec<String>,
-    selected_option: usize,
+    // Shell state
+    shell_input_buffer: String,
+    shell_history: Vec<(String, Color)>,
+    shell_cursor_timer: f32,
+    shell_cursor_visible: bool,
+    
     cursor_timer: f32,
     cursor_visible: bool,
     
@@ -307,6 +319,7 @@ impl GameState {
         Ok(GameState {
             scene: Scene::Boot,
             font,
+            language: Language::English,
             boot_lines,
             boot_text_cache,
             current_line: 0,
@@ -314,15 +327,13 @@ impl GameState {
             char_timer: 0.0,
             boot_complete_timer: 0.0,
             transition_timer: 0.0,
+            session_started: false,
             
-            menu_options: vec![
-                "1. Start X Server".to_string(),
-                "2. System Config".to_string(),
-                "3. Logout".to_string(),
-                "4. Reboot".to_string(),
-                "5. Shutdown".to_string(),
-            ],
-            selected_option: 0,
+            shell_input_buffer: String::new(),
+            shell_history: Vec::new(),
+            shell_cursor_timer: 0.0,
+            shell_cursor_visible: true,
+
             input_buffer: String::new(),
             login_error: None,
             cursor_timer: 0.0,
@@ -354,16 +365,20 @@ impl GameState {
         self.boot_grace_timer = 0.0;
         self.input_buffer.clear();
         self.login_error = None;
-        self.selected_option = 0;
+        self.shell_history.clear();
+        self.shell_input_buffer.clear();
+        self.session_started = false;
     }
 
     fn logout(&mut self) {
         self.scene = Scene::LoginUsername;
         self.input_buffer.clear();
         self.login_error = None;
-        self.selected_option = 0;
+        self.shell_history.clear();
+        self.shell_input_buffer.clear();
         self.windows.clear();
         self.mini_game = MiniGame::new();
+        self.session_started = false;
     }
 
     fn open_window(&mut self, title: &str, content: &str, kind: WindowKind) {
@@ -454,6 +469,11 @@ impl State for GameState {
                             self.input_buffer.push_str(&text);
                         }
                     }
+                    Scene::Menu => {
+                        if !text.chars().any(|c: char| c.is_control()) {
+                            self.shell_input_buffer.push_str(&text);
+                        }
+                    }
                     Scene::Desktop => {
                         // Check active window
                         if let Some(win) = self.windows.last_mut() {
@@ -481,6 +501,9 @@ impl State for GameState {
                 match self.scene {
                     Scene::LoginUsername | Scene::LoginPassword => {
                         self.input_buffer.pop();
+                    }
+                    Scene::Menu => {
+                        self.shell_input_buffer.pop();
                     }
                     Scene::Desktop => {
                         if let Some(win) = self.windows.last_mut() {
@@ -568,31 +591,138 @@ impl State for GameState {
                         // Accept any password
                         self.scene = Scene::Menu;
                         self.input_buffer.clear();
-                    }
-                    Scene::Menu => {
-                        match self.selected_option {
-                            0 => {
-                                self.scene = Scene::TransitionToDesktop;
-                                self.transition_timer = 0.0;
+                        
+                        // Add welcome message
+                        match self.language {
+                            Language::English => {
+                                self.shell_history.push(("Welcome to VibeCoded Linux 1.0 LTS (GNU/Linux 6.9.420-vibecoded x86_64)".to_string(), Color::WHITE));
+                                self.shell_history.push(("".to_string(), Color::WHITE));
+                                self.shell_history.push((" * Documentation:  https://vibecoded.com/help".to_string(), Color::rgb(0.4, 0.4, 1.0)));
+                                self.shell_history.push((" * Management:     https://vibecoded.com/manage".to_string(), Color::rgb(0.4, 0.4, 1.0)));
+                                self.shell_history.push((" * Support:        https://vibecoded.com/support".to_string(), Color::rgb(0.4, 0.4, 1.0)));
+                                self.shell_history.push(("".to_string(), Color::WHITE));
+                                self.shell_history.push(("System information as of Fri Dec 30 13:37:00 UTC 2025".to_string(), Color::GREEN));
+                                self.shell_history.push(("".to_string(), Color::WHITE));
+                                self.shell_history.push(("  System load:  0.00               Processes:             1337".to_string(), Color::rgb(0.7, 0.7, 0.7)));
+                                self.shell_history.push(("  Usage of /:   69.0% of 420GB     Users logged in:       1".to_string(), Color::rgb(0.7, 0.7, 0.7)));
+                                self.shell_history.push(("  Memory usage: 14%                IPv4 address for eth0: 192.168.1.69".to_string(), Color::rgb(0.7, 0.7, 0.7)));
+                                self.shell_history.push(("  Swap usage:   0%".to_string(), Color::rgb(0.7, 0.7, 0.7)));
+                                self.shell_history.push(("".to_string(), Color::WHITE));
+                                self.shell_history.push(("0 updates can be applied immediately.".to_string(), Color::GREEN));
+                                self.shell_history.push(("".to_string(), Color::WHITE));
+                                self.shell_history.push(("Last login: Fri Dec 27 12:00:00 2025 from 10.0.0.1".to_string(), Color::rgb(0.5, 0.5, 0.5)));
+                                self.shell_history.push(("Type 'help' for a list of commands.".to_string(), Color::rgb(1.0, 1.0, 0.0)));
                             }
-                            1 => self.scene = Scene::Config,
-                            2 => self.logout(),
-                            3 => self.reset(),
-                            4 => std::process::exit(0),
-                            _ => {}
+                            Language::Turkish => {
+                                self.shell_history.push(("VibeCoded Linux 1.0 LTS'e Hosgeldiniz (GNU/Linux 6.9.420-vibecoded x86_64)".to_string(), Color::WHITE));
+                                self.shell_history.push(("".to_string(), Color::WHITE));
+                                self.shell_history.push((" * Dokumantasyon:  https://vibecoded.com/help".to_string(), Color::rgb(0.4, 0.4, 1.0)));
+                                self.shell_history.push((" * Yonetim:        https://vibecoded.com/manage".to_string(), Color::rgb(0.4, 0.4, 1.0)));
+                                self.shell_history.push((" * Destek:         https://vibecoded.com/support".to_string(), Color::rgb(0.4, 0.4, 1.0)));
+                                self.shell_history.push(("".to_string(), Color::WHITE));
+                                self.shell_history.push(("Sistem bilgisi: Cum Ara 30 13:37:00 UTC 2025".to_string(), Color::GREEN));
+                                self.shell_history.push(("".to_string(), Color::WHITE));
+                                self.shell_history.push(("  Sistem yuku:    0.00               Islemler:              1337".to_string(), Color::rgb(0.7, 0.7, 0.7)));
+                                self.shell_history.push(("  Disk kullanimi: %69 / 420GB        Giris yapanlar:        1".to_string(), Color::rgb(0.7, 0.7, 0.7)));
+                                self.shell_history.push(("  Bellek:         %14                eth0 IPv4 adresi:      192.168.1.69".to_string(), Color::rgb(0.7, 0.7, 0.7)));
+                                self.shell_history.push(("  Takas alani:    %0".to_string(), Color::rgb(0.7, 0.7, 0.7)));
+                                self.shell_history.push(("".to_string(), Color::WHITE));
+                                self.shell_history.push(("0 guncelleme hemen uygulanabilir.".to_string(), Color::GREEN));
+                                self.shell_history.push(("".to_string(), Color::WHITE));
+                                self.shell_history.push(("Son giris: Cum Ara 27 12:00:00 2025 - 10.0.0.1".to_string(), Color::rgb(0.5, 0.5, 0.5)));
+                                self.shell_history.push(("Komut listesi icin 'help' yazin.".to_string(), Color::rgb(1.0, 1.0, 0.0)));
+                            }
                         }
                     }
+                    Scene::Menu => {
+                        let cmd = self.shell_input_buffer.trim().to_string();
+                        self.shell_history.push((format!("root@vibecoded:~# {}", cmd), Color::WHITE));
+                        
+                        match cmd.as_str() {
+                            "startx" => {
+                                self.scene = Scene::TransitionToDesktop;
+                                self.transition_timer = 0.0;
+                                self.session_started = true;
+                            }
+                            "help" => {
+                                match self.language {
+                                    Language::English => {
+                                        self.shell_history.push(("GNU bash, version 5.0.17(1)-release (x86_64-pc-linux-gnu)".to_string(), Color::rgb(0.7, 0.7, 0.7)));
+                                        self.shell_history.push(("These shell commands are defined internally.  Type `help' to see this list.".to_string(), Color::rgb(0.7, 0.7, 0.7)));
+                                        self.shell_history.push(("".to_string(), Color::WHITE));
+                                        self.shell_history.push(("  startx      Start the graphical desktop environment (Game)".to_string(), Color::GREEN));
+                                        self.shell_history.push(("  config      Open system configuration".to_string(), Color::rgb(0.0, 1.0, 1.0)));
+                                        self.shell_history.push(("  logout      Log out of the system".to_string(), Color::rgb(0.0, 1.0, 1.0)));
+                                        self.shell_history.push(("  reboot      Reboot the system".to_string(), Color::rgb(0.0, 1.0, 1.0)));
+                                        self.shell_history.push(("  shutdown    Power off the system".to_string(), Color::rgb(0.0, 1.0, 1.0)));
+                                        self.shell_history.push(("  clear       Clear the terminal screen".to_string(), Color::rgb(0.0, 1.0, 1.0)));
+                                        self.shell_history.push(("  whoami      Print effective userid".to_string(), Color::rgb(0.0, 1.0, 1.0)));
+                                        self.shell_history.push(("  uname -a    Print system information".to_string(), Color::rgb(0.0, 1.0, 1.0)));
+                                    }
+                                    Language::Turkish => {
+                                        self.shell_history.push(("GNU bash, surum 5.0.17(1)-release (x86_64-pc-linux-gnu)".to_string(), Color::rgb(0.7, 0.7, 0.7)));
+                                        self.shell_history.push(("Bu kabuk komutlari dahili olarak tanimlanmistir. Listeyi gormek icin `help' yazin.".to_string(), Color::rgb(0.7, 0.7, 0.7)));
+                                        self.shell_history.push(("".to_string(), Color::WHITE));
+                                        self.shell_history.push(("  startx      Grafik masaustu ortamini baslat (Oyun)".to_string(), Color::GREEN));
+                                        self.shell_history.push(("  config      Sistem yapilandirmasini ac".to_string(), Color::rgb(0.0, 1.0, 1.0)));
+                                        self.shell_history.push(("  logout      Sistemden cikis yap".to_string(), Color::rgb(0.0, 1.0, 1.0)));
+                                        self.shell_history.push(("  reboot      Sistemi yeniden baslat".to_string(), Color::rgb(0.0, 1.0, 1.0)));
+                                        self.shell_history.push(("  shutdown    Sistemi kapat".to_string(), Color::rgb(0.0, 1.0, 1.0)));
+                                        self.shell_history.push(("  clear       Terminal ekranini temizle".to_string(), Color::rgb(0.0, 1.0, 1.0)));
+                                        self.shell_history.push(("  whoami      Gecerli kullanici kimligini yazdir".to_string(), Color::rgb(0.0, 1.0, 1.0)));
+                                        self.shell_history.push(("  uname -a    Sistem bilgilerini yazdir".to_string(), Color::rgb(0.0, 1.0, 1.0)));
+                                    }
+                                }
+                            }
+                            "config" => self.scene = Scene::Config,
+                            "logout" | "exit" => self.logout(),
+                            "reboot" => self.reset(),
+                            "shutdown" => std::process::exit(0),
+                            "clear" => self.shell_history.clear(),
+                            "whoami" => self.shell_history.push(("root".to_string(), Color::WHITE)),
+                            "uname -a" => self.shell_history.push(("Linux vibecoded 6.9.420-vibecoded #1 SMP PREEMPT Fri Dec 30 13:37:00 UTC 2025 x86_64 GNU/Linux".to_string(), Color::WHITE)),
+                            "" => {}, // Do nothing on empty enter
+                            _ => {
+                                match self.language {
+                                    Language::English => self.shell_history.push((format!("bash: {}: command not found", cmd), Color::RED)),
+                                    Language::Turkish => self.shell_history.push((format!("bash: {}: komut bulunamadi", cmd), Color::RED)),
+                                }
+                            }
+                        }
+                        self.shell_input_buffer.clear();
+                    }
                     Scene::Config => {
+                        // Toggle language on L
+                        if input::is_key_pressed(ctx, Key::L) {
+                            self.language = match self.language {
+                                Language::English => Language::Turkish,
+                                Language::Turkish => Language::English,
+                            };
+                        }
                         // Exit config on Enter for now
-                        self.scene = Scene::Menu;
+                        if input::is_key_pressed(ctx, Key::Enter) {
+                            self.scene = Scene::Menu;
+                        }
                     }
                     _ => {}
                 }
             }
             Event::KeyPressed { key: Key::Escape } => {
                 match self.scene {
-                    Scene::Desktop | Scene::Config => {
+                    Scene::Desktop => {
+                        if self.mini_game.active {
+                            self.mini_game.active = false;
+                        } else {
+                            self.scene = Scene::Menu;
+                        }
+                    }
+                    Scene::Config => {
                         self.scene = Scene::Menu;
+                    }
+                    Scene::Menu => {
+                        if self.session_started {
+                            self.scene = Scene::Desktop;
+                        }
                     }
                     _ => {}
                 }
@@ -666,16 +796,11 @@ impl State for GameState {
                 }
             }
             Scene::Menu => {
-                // Input handling
-                if input::is_key_pressed(ctx, Key::Up) {
-                    if self.selected_option > 0 {
-                        self.selected_option -= 1;
-                    }
-                }
-                if input::is_key_pressed(ctx, Key::Down) {
-                    if self.selected_option < self.menu_options.len() - 1 {
-                        self.selected_option += 1;
-                    }
+                // Cursor blinking
+                self.shell_cursor_timer += 1.0;
+                if self.shell_cursor_timer > 30.0 {
+                    self.shell_cursor_timer = 0.0;
+                    self.shell_cursor_visible = !self.shell_cursor_visible;
                 }
             }
             Scene::TransitionToDesktop => {
@@ -975,33 +1100,23 @@ impl State for GameState {
                     graphics::set_transform_matrix(ctx, transform);
                 }
 
-                // Draw Login Prompt (Static history)
+                // Draw Shell History
                 let mut y = 20.0;
-                let mut login_text = Text::new("user login: root", self.font.clone());
-                login_text.draw(ctx, DrawParams::new().position(Vec2::new(20.0, y)).color(Color::WHITE));
                 
-                y += 24.0;
+                // Simple scrolling: if history is too long, show last N lines
+                let max_lines = 28;
+                let start_idx = if self.shell_history.len() > max_lines { self.shell_history.len() - max_lines } else { 0 };
                 
-                y += 24.0;
-                let mut welcome = Text::new("Last login: Fri Dec 27 12:00:00 on tty1", self.font.clone());
-                welcome.draw(ctx, DrawParams::new().position(Vec2::new(20.0, y)).color(Color::WHITE));
-                y += 40.0;
-
-                // Draw Menu Options as a shell script output or similar
-                for (i, option) in self.menu_options.iter().enumerate() {
-                    let prefix = if i == self.selected_option { "> " } else { "  " };
-                    let full_text = format!("{}{}", prefix, option);
-                    
-                    let color = if i == self.selected_option {
-                        Color::GREEN
-                    } else {
-                        Color::WHITE
-                    };
-                    
-                    let mut text = Text::new(full_text, self.font.clone());
-                    text.draw(ctx, DrawParams::new().position(Vec2::new(20.0, y)).color(color));
+                for (line, color) in self.shell_history.iter().skip(start_idx) {
+                    let mut text = Text::new(line, self.font.clone());
+                    text.draw(ctx, DrawParams::new().position(Vec2::new(20.0, y)).color(*color));
                     y += 20.0;
                 }
+                
+                // Draw Prompt
+                let prompt = format!("root@vibecoded:~# {}{}", self.shell_input_buffer, if self.shell_cursor_visible { "_" } else { "" });
+                let mut prompt_text = Text::new(prompt, self.font.clone());
+                prompt_text.draw(ctx, DrawParams::new().position(Vec2::new(20.0, y)).color(Color::WHITE));
                 
                 // Transition Effect
                 if t > 0.0 {
@@ -1131,13 +1246,21 @@ impl State for GameState {
                 // Draw a box
                 self.config_box_mesh.draw(ctx, DrawParams::new().position(Vec2::new(100.0, 100.0)).color(Color::rgb(0.7, 0.7, 0.7)));
 
-                let mut title = Text::new("System Configuration", self.font.clone());
+                let (title_str, content_str) = match self.language {
+                    Language::English => (
+                        "System Configuration",
+                        "Hostname: vibecoded\nKernel: 6.9.420-vibecoded\nMemory: 64MB\nLanguage: English (US) [Press L to Change]\n\n[ OK ] Save & Exit (Enter)"
+                    ),
+                    Language::Turkish => (
+                        "Sistem Yapilandirmasi",
+                        "Makine Adi: vibecoded\nCekirdek: 6.9.420-vibecoded\nBellek: 64MB\nDil: Turkce (TR) [Degistirmek icin L]\n\n[ OK ] Kaydet & Cik (Enter)"
+                    ),
+                };
+
+                let mut title = Text::new(title_str, self.font.clone());
                 title.draw(ctx, DrawParams::new().position(Vec2::new(300.0, 120.0)).color(Color::BLACK));
                 
-                let mut content = Text::new(
-                    "Hostname: vibecoded\nKernel: 6.9.420-vibecoded\nMemory: 64MB\n\n[ OK ] Save & Exit", 
-                    self.font.clone()
-                );
+                let mut content = Text::new(content_str, self.font.clone());
                 content.draw(ctx, DrawParams::new().position(Vec2::new(150.0, 180.0)).color(Color::BLACK));
             }
         }
@@ -1148,7 +1271,7 @@ impl State for GameState {
 
 fn main() -> tetra::Result {
     ContextBuilder::new("Linux VibeCoded Game", SCREEN_WIDTH, SCREEN_HEIGHT)
-        .quit_on_escape(true)
+        .quit_on_escape(false)
         .build()?
         .run(GameState::new)
 }
