@@ -1,2 +1,16 @@
 /target
 users.db
+
+# LaTeX
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.pdf
+*.dvi
+*.bbl
+*.blg
+*.xdv

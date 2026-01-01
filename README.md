@@ -2,31 +2,78 @@
 
 A retro-style Linux operating system simulation and game built with Rust and Tetra.
 
-<img width="800" height="632" alt="image" src="https://github.com/user-attachments/assets/e5f8997f-7297-4ace-84d7-21c4eee3f7ef" />
-<img width="800" height="632" alt="image" src="https://github.com/user-attachments/assets/b272ffd5-6580-478e-885d-b77ba425c696" />
-<img width="800" height="632" alt="image" src="https://github.com/user-attachments/assets/d5d825dd-4db6-4f59-9aa2-29b7f6100f45" />
-<img width="800" height="632" alt="image" src="https://github.com/user-attachments/assets/8774a62a-4fd1-4cde-b05e-42cdb7f801bc" />
-<img width="800" height="632" alt="image" src="https://github.com/user-attachments/assets/9d07eab0-d351-4aa4-99bb-d2eac5e0701d" />
-<img width="800" height="632" alt="image" src="https://github.com/user-attachments/assets/acaa32e1-abc6-4cd8-a72d-fb8ac997feb7" />
-
-<img width="800" height="632" alt="image" src="https://github.com/user-attachments/assets/c199c901-a246-4b2e-a996-281e2107e0fd" />
-<img width="800" height="632" alt="image" src="https://github.com/user-attachments/assets/28590cd6-f869-437f-9d3d-8eade34afe78" />
-
+| | | |
+|:---:|:---:|:---:|
+| <img width="100%" alt="image" src="https://github.com/user-attachments/assets/e5f8997f-7297-4ace-84d7-21c4eee3f7ef" /> | <img width="100%" alt="image" src="https://github.com/user-attachments/assets/b272ffd5-6580-478e-885d-b77ba425c696" /> | <img width="100%" alt="image" src="https://github.com/user-attachments/assets/d5d825dd-4db6-4f59-9aa2-29b7f6100f45" /> |
+| <img width="100%" alt="image" src="https://github.com/user-attachments/assets/8774a62a-4fd1-4cde-b05e-42cdb7f801bc" /> | <img width="100%" alt="image" src="https://github.com/user-attachments/assets/9d07eab0-d351-4aa4-99bb-d2eac5e0701d" /> | <img width="100%" alt="image" src="https://github.com/user-attachments/assets/acaa32e1-abc6-4cd8-a72d-fb8ac997feb7" /> |
+| <img width="100%" alt="image" src="https://github.com/user-attachments/assets/c199c901-a246-4b2e-a996-281e2107e0fd" /> | <img width="100%" alt="image" src="https://github.com/user-attachments/assets/28590cd6-f869-437f-9d3d-8eade34afe78" /> | |
 
 ## Overview
 
-Welcome to **Takfir Tale 1.0 LTS**. This project simulates the experience of booting up an old-school Linux machine, complete with systemd boot logs, a TTY login screen, and a graphical desktop environment (X11).
+Welcome to **Takfir Tale 1.0 LTS**. This project simulates the experience of booting up an old-school Linux machine, complete with systemd boot logs and a TTY login screen.
 
-Hidden within the system is a story about a corrupted kernel and a mysterious entity named "Glitch". Can you purge the corruption and save the system?
+Beyond the terminal lies a surreal adventure. Log in, explore the system, and launch into a world where you must interact with mysterious characters and uncover the secrets of the "VibeCoded" kernel.
 
 ## Features
 
 *   **Realistic Boot Sequence:** Watch the system services start up with a nostalgic typing effect.
-*   **Interactive Login:** Log in as `root` to access the system.
-*   **Shell Menu:** Navigate through system options like starting the X Server or configuring the system.
-*   **Desktop Environment:** A simulated GUI with icons, windows, and a taskbar.
-*   **Story Mode:** Interact with NPCs via IRC, use the Terminal to find system secrets, and unlock hidden game modes.
-*   **System_Def Minigame:** A top-down shooter where you defend the memory blocks from corruption.
+*   **Interactive Login:** Log in as `root` or create your own user to access the system.
+*   **Functional Shell:** A working terminal environment where you can run commands like `neofetch`, `users`, and `startx`.
+*   **Adventure Mode:** Launch the graphical game world to explore different stages and interact with NPCs.
+*   **Story Elements:** Engage with characters and uncover a narrative involving "Teblig", "Cihad", and "Tekfir".
+*   **Combat & Defense:** Defend yourself against threats in specific game stages.
+
+## Shell Commands
+
+The in-game terminal supports a variety of commands to interact with the system:
+
+*   `startx`: Starts the graphical adventure mode (Game).
+*   `adduser <username>`: Creates a new user profile.
+*   `users`: Lists all registered users on the system.
+*   `neofetch`: Displays system information and the VibeCoded logo.
+*   `music`: Toggles the background music (Disco Mode).
+*   `config`: Opens the system configuration menu.
+*   `logout`: Logs out of the current session.
+*   `reboot`: Reboots the simulated system.
+*   `shutdown`: Powers off the system.
+*   `clear`: Clears the terminal screen.
+*   `whoami`: Displays the current user's name.
+*   `uname -a`: Prints system kernel information.
+
+## Combat & Dialogues
+
+In combat encounters (like against Sans), you have unique interaction options beyond just attacking ("Cihad").
+
+### Tekfir (Act)
+You can declare the opponent as various types of non-believers. Here are some of their reactions:
+
+*   **Müşrik:** "Ona Müşrik dedin. Sana güldü." / "Ona Müşrik dedin. 'Sen de kimsin?' dedi."
+*   **Fasık:** "Ona Fasık dedin. Umursamadı." / "Ona Fasık dedin. Esneyerek cevap verdi."
+*   **Münafık:** "Ona Münafık dedin. Omuz silkti." / "Ona Münafık dedin. 'Kanıtın var mı?' dedi."
+*   **Kafir:** "Ona Kafir dedin. Sırıttı." / "Ona Kafir dedin. 'Bunu iltifat sayarım' dedi."
+*   **Zındık:** "Ona Zındık dedin. Kahkaha attı." / "Ona Zındık dedin. 'Eski moda bir hakaret' dedi."
+*   **Tağut:** "Ona Tağut dedin. Göz kırptı." / "Ona Tağut dedin. 'Gücümü kabul ediyorsun' dedi."
+*   **Deccal:** "Ona Deccal dedin. 'Tek gözüm bile yeter' dedi." / "Ona Deccal dedin. Alnını gösterdi."
+*   **Ebu Cehil:** "Ona Ebu Cehil dedin. 'Cehalet mutluluktur' dedi." / "Ona Ebu Cehil dedin. Karpuz fırlattı."
+*   **Yecüc:** "Ona Yecüc dedin. 'Mecüc nerede?' diye sordu." / "Ona Yecüc dedin. Duvarı kemirmeye başladı."
+
+### Tebliğ (Mercy)
+You can try to preach and guide them to the right path. Results may vary:
+
+*   "Ona İslam'ı anlattın. Sana güldü."
+*   "Tövbe etmesini söyledin. Umursamadı."
+*   "Cehennem ateşinden bahsettin. Omuz silkti."
+*   "Ona hidayet diledin. Hala sırıtıyor."
+*   "Ona Kuran okudun. Rahatsız oldu."
+*   "Ona hadis anlattın. Kulaklarını tıkadı."
+*   "Ona ölümü hatırlattın. Ürperdi ama belli etmedi."
+*   "Ona cenneti anlattın. 'İlgilenmiyorum' dedi."
+*   "Ona selam verdin. Almadı."
+*   "Ona dua ettin. Gözlerini devirdi."
+*   "Ona zemzem ikram ettin. 'Kola yok mu?' dedi."
+*   "Ona misvak uzattın. 'Diş fırçam var' dedi."
+*   "Ona takke takmaya çalıştın. Kafasını çekti."
+*   "Ona tesbih hediye ettin. Boncuk sandı."
 
 ## How to Play
 
@@ -43,33 +90,18 @@ cargo run
 
 ### Controls
 
-**System:**
-*   `Enter`: Confirm / Select
-*   `Esc`: Go back / Close window
+**System (Boot/Shell):**
+*   `Enter`: Confirm / Execute command
+*   `Esc`: Go back
 *   `Up/Down Arrows`: Navigate menus
 
-**Desktop:**
-*   `Mouse Left Click`: Interact with icons and windows
-*   `Keyboard`: Type in Terminal and Chat windows
-
-**System_Def (Minigame):**
-*   `W, A, S, D`: Move Player
-*   `Mouse Left Click`: Shoot
-*   `R`: Restart Game (if Game Over)
-
-## Story Guide (Spoilers!)
-
-1.  **Login:** Username: `root`, Password: (any)
-2.  **Start X Server:** Select option 1 from the menu.
-3.  **Check Mail:** Read the message about system corruption.
-4.  **Contact Glitch:** Open the "Chat" icon to talk to the contact.
-5.  **Prove Identity:** Use the "Terminal" to run `sys_check` and find the integrity hash.
-6.  **Unlock Deep Scan:** Provide the hash to Glitch to upgrade your defense protocols.
-7.  **Purge:** Launch "System_Def" and survive.
+**Adventure Mode:**
+*   `WASD` or `Arrow Keys`: Move character
+*   `Space`: Interact
 
 ## License
 
-This project is open source.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 *Developed by ByCh4n-Group*
