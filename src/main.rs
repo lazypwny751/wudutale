@@ -9,7 +9,7 @@ use crate::defs::{SCREEN_WIDTH, SCREEN_HEIGHT};
 use crate::game_state::GameState;
 
 fn main() -> tetra::Result {
-    ContextBuilder::new("Linux VibeCoded Game", SCREEN_WIDTH, SCREEN_HEIGHT)
+    ContextBuilder::new("Takfir Tale", SCREEN_WIDTH, SCREEN_HEIGHT)
         .quit_on_escape(false)
         .build()?
         .run(GameState::new)

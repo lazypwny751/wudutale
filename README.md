@@ -1,4 +1,4 @@
-# VibeCoded Linux Simulation
+# Takfir Tale
 
 A retro-style Linux operating system simulation and game built with Rust and Tetra.
 
@@ -9,7 +9,7 @@ A retro-style Linux operating system simulation and game built with Rust and Tet
 
 ## Overview
 
-Welcome to **VibeCoded Linux 1.0 LTS**. This project simulates the experience of booting up an old-school Linux machine, complete with systemd boot logs, a TTY login screen, and a graphical desktop environment (X11).
+Welcome to **Takfir Tale 1.0 LTS**. This project simulates the experience of booting up an old-school Linux machine, complete with systemd boot logs, a TTY login screen, and a graphical desktop environment (X11).
 
 Hidden within the system is a story about a corrupted kernel and a mysterious entity named "Glitch". Can you purge the corruption and save the system?
 
@@ -30,8 +30,8 @@ Hidden within the system is a story about a corrupted kernel and a mysterious en
 
 ### Running the Game
 ```bash
-git clone https://github.com/ByCh4n-Group/linux_vibecoded_game
-cd linux_vibecoded_game
+git clone https://github.com/ByCh4n-Group/takfirtale
+cd takfirtale
 cargo run
 ```
 

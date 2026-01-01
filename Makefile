@@ -1,4 +1,4 @@
-APP_NAME = linux_vibecoded_game
+APP_NAME = takfirtale
 VERSION = 1.0.0
 
 .PHONY: all clean release release-linux release-windows
