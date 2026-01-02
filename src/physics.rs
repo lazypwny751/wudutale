@@ -1,5 +1,5 @@
-use tetra::math::Vec2;
 use crate::world::WorldState;
+use tetra::math::Vec2;
 
 pub struct Collider {
     pub pos: Vec2<f32>,
@@ -12,7 +12,7 @@ pub fn check_collision(pos: Vec2<f32>, radius: f32, world: &WorldState) -> bool 
         let dx = pos.x - collider.pos.x;
         let dy = pos.y - collider.pos.y;
         let distance = (dx * dx + dy * dy).sqrt();
-        
+
         if distance < (radius + collider.radius) {
             return true;
         }
@@ -22,7 +22,7 @@ pub fn check_collision(pos: Vec2<f32>, radius: f32, world: &WorldState) -> bool 
 
 fn get_colliders(world: &WorldState) -> Vec<Collider> {
     let mut colliders = Vec::new();
-    
+
     match world.current_stage {
         1 => {
             // Sans
@@ -59,6 +59,6 @@ fn get_colliders(world: &WorldState) -> Vec<Collider> {
         }
         _ => {}
     }
-    
+
     colliders
 }

@@ -1,13 +1,13 @@
+use crate::defs::Direction;
 use tetra::graphics::Texture;
 use tetra::math::Vec2;
-use crate::defs::Direction;
 
 pub struct PlayerState {
     pub pos: Vec2<f32>,
     pub direction: Direction,
     pub health: f32,
     pub outfit: u8, // 0: None, 1: Fes, 2: Takke
-    
+
     // Textures
     pub texture_front: Option<Texture>,
     pub texture_left: Option<Texture>,

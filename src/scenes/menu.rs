@@ -1,10 +1,10 @@
-use tetra::Context;
-use tetra::graphics::{Color, DrawParams, Rectangle};
-use tetra::graphics::text::Text;
-use tetra::math::Vec2;
-use rand::Rng;
+use crate::defs::{SCREEN_HEIGHT, SCREEN_WIDTH, Scene};
 use crate::game_state::GameState;
-use crate::defs::{SCREEN_WIDTH, SCREEN_HEIGHT, Scene};
+use rand::Rng;
+use tetra::Context;
+use tetra::graphics::text::Text;
+use tetra::graphics::{Color, DrawParams, Rectangle};
+use tetra::math::Vec2;
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum MenuSubState {
@@ -29,11 +29,16 @@ pub struct MenuState {
     pub title_blink_timers: Vec<f32>,
     pub input_buffer: String,
     pub error_message: Option<String>,
-    
+
     // Chase Animation
-    pub chara_pos: Vec2<f32>,
-    pub sans_pos: Vec2<f32>,
-    pub is_chara_chasing: bool, // true = Chara chases Sans, false = Sans chases Chara
+    pub chasers: Vec<ChaseEntity>,
+}
+
+pub struct ChaseEntity {
+    pub pos: Vec2<f32>,
+    pub velocity: Vec2<f32>,
+    pub rotation: f32,
+    pub is_sans: bool,
 }
 
 impl MenuState {
@@ -72,10 +77,8 @@ impl MenuState {
             title_blink_timers,
             input_buffer: String::new(),
             error_message: None,
-            
-            chara_pos: Vec2::new(-100.0, 500.0),
-            sans_pos: Vec2::new(100.0, 500.0),
-            is_chara_chasing: true,
+
+            chasers: Vec::new(),
         }
     }
 }
@@ -100,30 +103,51 @@ pub fn update(_ctx: &mut Context, state: &mut GameState) -> tetra::Result {
     }
 
     // Update Chase Animation
-    let speed = 3.0;
-    if state.menu_state.is_chara_chasing {
-        // Chara chases Sans (Left to Right)
-        state.menu_state.sans_pos.x += speed;
-        state.menu_state.chara_pos.x += speed;
-        
-        if state.menu_state.chara_pos.x > SCREEN_WIDTH as f32 + 100.0 {
-            // Reset for Sans chasing Chara (Right to Left)
-            state.menu_state.is_chara_chasing = false;
-            state.menu_state.chara_pos = Vec2::new(SCREEN_WIDTH as f32 + 100.0, 500.0);
-            state.menu_state.sans_pos = Vec2::new(SCREEN_WIDTH as f32 + 300.0, 500.0);
-        }
-    } else {
-        // Sans chases Chara (Right to Left)
-        state.menu_state.chara_pos.x -= speed;
-        state.menu_state.sans_pos.x -= speed;
-        
-        if state.menu_state.sans_pos.x < -100.0 {
-            // Reset for Chara chasing Sans (Left to Right)
-            state.menu_state.is_chara_chasing = true;
-            state.menu_state.sans_pos = Vec2::new(-100.0, 500.0);
-            state.menu_state.chara_pos = Vec2::new(-300.0, 500.0);
-        }
+    // Spawn new chasers
+    if state.menu_state.chasers.len() < 5 && rng.gen_bool(0.02) {
+        let is_sans = rng.gen_bool(0.5);
+        let start_side = rng.gen_bool(0.5); // true = left, false = right
+
+        let x = if start_side {
+            -50.0
+        } else {
+            SCREEN_WIDTH as f32 + 50.0
+        };
+        let y = rng.gen_range(50.0..SCREEN_HEIGHT as f32 - 50.0);
+
+        let target_x = if start_side {
+            SCREEN_WIDTH as f32 + 100.0
+        } else {
+            -100.0
+        };
+        let target_y = rng.gen_range(50.0..SCREEN_HEIGHT as f32 - 50.0);
+
+        let dx = target_x - x;
+        let dy = target_y - y;
+        let dist = (dx * dx + dy * dy).sqrt();
+        let speed = rng.gen_range(3.0..6.0);
+
+        let velocity = Vec2::new((dx / dist) * speed, (dy / dist) * speed);
+        let rotation = dy.atan2(dx); // Calculate rotation based on velocity vector
+
+        state.menu_state.chasers.push(ChaseEntity {
+            pos: Vec2::new(x, y),
+            velocity,
+            rotation,
+            is_sans,
+        });
     }
+
+    // Update chasers
+    state.menu_state.chasers.retain_mut(|chaser| {
+        chaser.pos += chaser.velocity;
+
+        // Remove if far off screen
+        chaser.pos.x > -100.0
+            && chaser.pos.x < SCREEN_WIDTH as f32 + 100.0
+            && chaser.pos.y > -100.0
+            && chaser.pos.y < SCREEN_HEIGHT as f32 + 100.0
+    });
 
     Ok(())
 }
@@ -132,42 +156,38 @@ pub fn draw(ctx: &mut Context, state: &mut GameState) -> tetra::Result {
     // Draw Snow
     for particle in &state.menu_state.snow_particles {
         let rect = Rectangle::new(particle.pos.x, particle.pos.y, particle.size, particle.size);
-        let mesh = tetra::graphics::mesh::Mesh::rectangle(ctx, tetra::graphics::mesh::ShapeStyle::Fill, rect)?;
+        let mesh = tetra::graphics::mesh::Mesh::rectangle(
+            ctx,
+            tetra::graphics::mesh::ShapeStyle::Fill,
+            rect,
+        )?;
         mesh.draw(ctx, DrawParams::new().color(Color::WHITE));
     }
 
     // Draw Chase Animation (Background)
-    // We need textures for Chara and Sans. Assuming they are loaded in GameState.
-    // If not, we might need to use placeholders or ensure they are loaded.
-    // Based on assets.rs, index 0 is Player Front (Chara?), index 8 is Sans.
-    // Let's check if they are loaded.
-    
-    let chara_texture = if state.is_asset_loaded(0) {
-        state.player.texture_front.clone()
-    } else { None };
+    for chaser in &state.menu_state.chasers {
+        let texture = if chaser.is_sans {
+            state.world.sans_texture.clone()
+        } else if chaser.velocity.x < 0.0 {
+            state.player.texture_left.clone()
+        } else {
+            state.player.texture_right.clone()
+        };
 
-    let sans_texture = if state.is_asset_loaded(8) {
-        state.world.sans_texture.clone()
-    } else { None };
+        if let Some(tex) = texture {
+            let width = tex.width() as f32;
+            let height = tex.height() as f32;
+            let origin = Vec2::new(width / 2.0, height / 2.0);
 
-    if let (Some(chara), Some(sans)) = (chara_texture, sans_texture) {
-        // Draw Chara
-        let chara_scale = if state.menu_state.is_chara_chasing { Vec2::new(2.0, 2.0) } else { Vec2::new(-2.0, 2.0) }; // Flip if running left
-        chara.draw(ctx, DrawParams::new()
-            .position(state.menu_state.chara_pos)
-            .origin(Vec2::new(chara.width() as f32 / 2.0, chara.height() as f32 / 2.0))
-            .scale(chara_scale)
-            .color(Color::rgba(1.0, 1.0, 1.0, 0.5)) // Semi-transparent for background effect
-        );
-
-        // Draw Sans
-        let sans_scale = if state.menu_state.is_chara_chasing { Vec2::new(2.0, 2.0) } else { Vec2::new(-2.0, 2.0) };
-        sans.draw(ctx, DrawParams::new()
-            .position(state.menu_state.sans_pos)
-            .origin(Vec2::new(sans.width() as f32 / 2.0, sans.height() as f32 / 2.0))
-            .scale(sans_scale)
-            .color(Color::rgba(1.0, 1.0, 1.0, 0.5))
-        );
+            tex.draw(
+                ctx,
+                DrawParams::new()
+                    .position(chaser.pos)
+                    .origin(origin)
+                    .rotation(chaser.rotation)
+                    .color(Color::rgba(1.0, 1.0, 1.0, 0.5)),
+            );
+        }
     }
 
     match state.menu_state.sub_state {
@@ -182,11 +202,14 @@ pub fn draw(ctx: &mut Context, state: &mut GameState) -> tetra::Result {
     if state.scene == Scene::TransitionToDesktop {
         let alpha = (state.transition_timer / 120.0).min(1.0);
         let fade_rect = tetra::graphics::mesh::Mesh::rectangle(
-            ctx, 
-            tetra::graphics::mesh::ShapeStyle::Fill, 
-            Rectangle::new(0.0, 0.0, SCREEN_WIDTH as f32, SCREEN_HEIGHT as f32)
+            ctx,
+            tetra::graphics::mesh::ShapeStyle::Fill,
+            Rectangle::new(0.0, 0.0, SCREEN_WIDTH as f32, SCREEN_HEIGHT as f32),
         )?;
-        fade_rect.draw(ctx, DrawParams::new().color(Color::rgba(0.0, 0.0, 0.0, alpha)));
+        fade_rect.draw(
+            ctx,
+            DrawParams::new().color(Color::rgba(0.0, 0.0, 0.0, alpha)),
+        );
     }
 
     Ok(())
@@ -201,18 +224,20 @@ fn draw_main_menu(ctx: &mut Context, state: &mut GameState) -> tetra::Result {
     for (i, char) in title.chars().enumerate() {
         let timer = state.menu_state.title_blink_timers[i];
         let alpha = if timer > 0.2 { 1.0 } else { 0.3 }; // Blink effect
-        
+
         let mut text = Text::new(char.to_string(), state.font.clone());
         let pos = Vec2::new(start_x + (i as f32 * 40.0), start_y);
         let color = Color::rgba(1.0, 1.0, 1.0, alpha);
-        
+
         // Simulate Bold by drawing multiple times with slight offsets
         for offset_x in 0..=1 {
             for offset_y in 0..=1 {
-                text.draw(ctx, DrawParams::new()
-                    .position(pos + Vec2::new(offset_x as f32, offset_y as f32))
-                    .scale(Vec2::new(2.0, 2.0))
-                    .color(color)
+                text.draw(
+                    ctx,
+                    DrawParams::new()
+                        .position(pos + Vec2::new(offset_x as f32, offset_y as f32))
+                        .scale(Vec2::new(2.0, 2.0))
+                        .color(color),
                 );
             }
         }
@@ -222,36 +247,54 @@ fn draw_main_menu(ctx: &mut Context, state: &mut GameState) -> tetra::Result {
     if let Some(user) = state.system.users.first() {
         let user_text = format!("Current Profile: {}", user.username);
         let mut text = Text::new(user_text, state.font.clone());
-        text.draw(ctx, DrawParams::new()
-            .position(Vec2::new(20.0, 20.0))
-            .color(Color::rgb(0.7, 0.7, 0.7))
+        text.draw(
+            ctx,
+            DrawParams::new()
+                .position(Vec2::new(20.0, 20.0))
+                .color(Color::rgb(0.7, 0.7, 0.7)),
         );
     } else {
         let mut text = Text::new("No Profile Selected", state.font.clone());
-        text.draw(ctx, DrawParams::new()
-            .position(Vec2::new(20.0, 20.0))
-            .color(Color::rgb(0.7, 0.7, 0.7))
+        text.draw(
+            ctx,
+            DrawParams::new()
+                .position(Vec2::new(20.0, 20.0))
+                .color(Color::rgb(0.7, 0.7, 0.7)),
         );
     }
 
     // Draw Options
-    let menu_start_y = (SCREEN_HEIGHT as f32 / 2.0) - (state.menu_state.options.len() as f32 * 20.0); // Center vertically
+    let menu_start_y =
+        (SCREEN_HEIGHT as f32 / 2.0) - (state.menu_state.options.len() as f32 * 20.0); // Center vertically
     let menu_start_x = (SCREEN_WIDTH as f32 / 2.0) - 100.0; // Fixed X position for left alignment, slightly offset from center
 
+    let users_exist = !state.system.users.is_empty();
+
     for (i, option) in state.menu_state.options.iter().enumerate() {
-        let color = if i == state.menu_state.selected_index {
+        let is_start_game = i == 0;
+        let disabled = is_start_game && !users_exist;
+
+        let color = if disabled {
+            Color::rgb(0.3, 0.3, 0.3) // Dark Gray
+        } else if i == state.menu_state.selected_index {
             Color::rgb(1.0, 1.0, 0.0)
         } else {
             Color::WHITE
         };
 
-        let prefix = if i == state.menu_state.selected_index { "> " } else { "  " };
+        let prefix = if i == state.menu_state.selected_index {
+            "> "
+        } else {
+            "  "
+        };
         let mut text = Text::new(format!("{}{}", prefix, option), state.font.clone());
-        
+
         // Left aligned at fixed X
-        text.draw(ctx, DrawParams::new()
-            .position(Vec2::new(menu_start_x, menu_start_y + (i as f32 * 40.0)))
-            .color(color)
+        text.draw(
+            ctx,
+            DrawParams::new()
+                .position(Vec2::new(menu_start_x, menu_start_y + (i as f32 * 40.0)))
+                .color(color),
         );
     }
 
@@ -260,10 +303,15 @@ fn draw_main_menu(ctx: &mut Context, state: &mut GameState) -> tetra::Result {
 
 fn draw_save_select(ctx: &mut Context, state: &mut GameState) -> tetra::Result {
     let mut title = Text::new("Select Profile", state.font.clone());
-    title.draw(ctx, DrawParams::new().position(Vec2::new(300.0, 50.0)).scale(Vec2::new(1.5, 1.5)));
+    title.draw(
+        ctx,
+        DrawParams::new()
+            .position(Vec2::new(300.0, 50.0))
+            .scale(Vec2::new(1.5, 1.5)),
+    );
 
     let start_y = 150.0;
-    
+
     // List users
     for (i, user) in state.system.users.iter().enumerate() {
         let color = if i == state.menu_state.selected_index {
@@ -271,25 +319,41 @@ fn draw_save_select(ctx: &mut Context, state: &mut GameState) -> tetra::Result {
         } else {
             Color::WHITE
         };
-        
-        let prefix = if i == state.menu_state.selected_index { "> " } else { "  " };
+
+        let prefix = if i == state.menu_state.selected_index {
+            "> "
+        } else {
+            "  "
+        };
         let mut text = Text::new(format!("{}{}", prefix, user.username), state.font.clone());
-        text.draw(ctx, DrawParams::new()
-            .position(Vec2::new(200.0, start_y + (i as f32 * 30.0)))
-            .color(color)
+        text.draw(
+            ctx,
+            DrawParams::new()
+                .position(Vec2::new(200.0, start_y + (i as f32 * 30.0)))
+                .color(color),
         );
     }
 
     // "Press Esc to go back"
     let mut hint = Text::new("Press Esc to go back", state.font.clone());
-    hint.draw(ctx, DrawParams::new().position(Vec2::new(200.0, 500.0)).color(Color::rgb(0.5, 0.5, 0.5)));
+    hint.draw(
+        ctx,
+        DrawParams::new()
+            .position(Vec2::new(200.0, 500.0))
+            .color(Color::rgb(0.5, 0.5, 0.5)),
+    );
 
     Ok(())
 }
 
 fn draw_create_save(ctx: &mut Context, state: &mut GameState) -> tetra::Result {
     let mut title = Text::new("Create New Profile", state.font.clone());
-    title.draw(ctx, DrawParams::new().position(Vec2::new(250.0, 100.0)).scale(Vec2::new(1.5, 1.5)));
+    title.draw(
+        ctx,
+        DrawParams::new()
+            .position(Vec2::new(250.0, 100.0))
+            .scale(Vec2::new(1.5, 1.5)),
+    );
 
     let mut prompt = Text::new("Enter Name:", state.font.clone());
     prompt.draw(ctx, DrawParams::new().position(Vec2::new(250.0, 200.0)));
@@ -303,38 +367,68 @@ fn draw_create_save(ctx: &mut Context, state: &mut GameState) -> tetra::Result {
     };
 
     let mut input = Text::new(display_text, state.font.clone());
-    input.draw(ctx, DrawParams::new().position(Vec2::new(250.0, 240.0)).color(Color::rgb(1.0, 1.0, 0.0)));
+    input.draw(
+        ctx,
+        DrawParams::new()
+            .position(Vec2::new(250.0, 240.0))
+            .color(Color::rgb(1.0, 1.0, 0.0)),
+    );
 
     if let Some(err) = &state.menu_state.error_message {
         let mut err_text = Text::new(err, state.font.clone());
-        err_text.draw(ctx, DrawParams::new().position(Vec2::new(250.0, 300.0)).color(Color::RED));
+        err_text.draw(
+            ctx,
+            DrawParams::new()
+                .position(Vec2::new(250.0, 300.0))
+                .color(Color::RED),
+        );
     }
 
     let mut hint = Text::new("Press Enter to Confirm, Esc to Cancel", state.font.clone());
-    hint.draw(ctx, DrawParams::new().position(Vec2::new(200.0, 500.0)).color(Color::rgb(0.5, 0.5, 0.5)));
+    hint.draw(
+        ctx,
+        DrawParams::new()
+            .position(Vec2::new(200.0, 500.0))
+            .color(Color::rgb(0.5, 0.5, 0.5)),
+    );
 
     Ok(())
 }
 
 fn draw_settings(ctx: &mut Context, state: &mut GameState) -> tetra::Result {
     let mut title = Text::new("Settings", state.font.clone());
-    title.draw(ctx, DrawParams::new().position(Vec2::new(300.0, 50.0)).scale(Vec2::new(1.5, 1.5)));
+    title.draw(
+        ctx,
+        DrawParams::new()
+            .position(Vec2::new(300.0, 50.0))
+            .scale(Vec2::new(1.5, 1.5)),
+    );
 
     let lang_text = format!("Language: {:?}", state.system.language);
     let mut text = Text::new(lang_text, state.font.clone());
     text.draw(ctx, DrawParams::new().position(Vec2::new(200.0, 200.0)));
 
     let mut hint = Text::new("Press Esc to go back", state.font.clone());
-    hint.draw(ctx, DrawParams::new().position(Vec2::new(200.0, 500.0)).color(Color::rgb(0.5, 0.5, 0.5)));
+    hint.draw(
+        ctx,
+        DrawParams::new()
+            .position(Vec2::new(200.0, 500.0))
+            .color(Color::rgb(0.5, 0.5, 0.5)),
+    );
 
     Ok(())
 }
 
 fn draw_credits(ctx: &mut Context, state: &mut GameState) -> tetra::Result {
     let mut title = Text::new("Credits", state.font.clone());
-    title.draw(ctx, DrawParams::new().position(Vec2::new(300.0, 50.0)).scale(Vec2::new(1.5, 1.5)));
+    title.draw(
+        ctx,
+        DrawParams::new()
+            .position(Vec2::new(300.0, 50.0))
+            .scale(Vec2::new(1.5, 1.5)),
+    );
 
-    let credits = vec![
+    let credits = [
         "Developed by: VibeCoded",
         "Engine: Tetra (Rust)",
         "Art: ...",
@@ -343,11 +437,19 @@ fn draw_credits(ctx: &mut Context, state: &mut GameState) -> tetra::Result {
 
     for (i, line) in credits.iter().enumerate() {
         let mut text = Text::new(*line, state.font.clone());
-        text.draw(ctx, DrawParams::new().position(Vec2::new(200.0, 150.0 + (i as f32 * 30.0))));
+        text.draw(
+            ctx,
+            DrawParams::new().position(Vec2::new(200.0, 150.0 + (i as f32 * 30.0))),
+        );
     }
 
     let mut hint = Text::new("Press Esc to go back", state.font.clone());
-    hint.draw(ctx, DrawParams::new().position(Vec2::new(200.0, 500.0)).color(Color::rgb(0.5, 0.5, 0.5)));
+    hint.draw(
+        ctx,
+        DrawParams::new()
+            .position(Vec2::new(200.0, 500.0))
+            .color(Color::rgb(0.5, 0.5, 0.5)),
+    );
 
     Ok(())
 }

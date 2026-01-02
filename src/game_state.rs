@@ -1,34 +1,65 @@
+use rand::Rng;
+use tetra::Event;
 use tetra::graphics::mesh::{Mesh, ShapeStyle};
 use tetra::graphics::text::{Font, Text};
 use tetra::graphics::{self, Color, DrawParams, Rectangle, Texture};
-use tetra::input::{self, Key};
-use tetra::Event;
 use tetra::math::Vec2;
 use tetra::{Context, State};
 
-use crate::defs::{Scene, Direction, SCREEN_WIDTH, SCREEN_HEIGHT};
 use crate::combat::CombatData;
+use crate::defs::{SCREEN_HEIGHT, SCREEN_WIDTH, Scene};
 use crate::player::PlayerState;
-use crate::world::WorldState;
 use crate::system::SystemState;
+use crate::texts::TextResources;
+use crate::world::WorldState;
+
+pub struct GameOverState {
+    pub current_stat_index: usize,
+    pub stat_pos: Vec2<f32>,
+    pub stat_alpha: f32,
+    pub stat_fading_in: bool,
+    pub selected_option: usize,
+
+    // Dynamic Message
+    pub message_text: String,
+    pub message_alpha: f32,
+    pub message_fading_in: bool,
+    pub message_timer: f32,
+}
+
+impl GameOverState {
+    pub fn new() -> Self {
+        Self {
+            current_stat_index: 0,
+            stat_pos: Vec2::new(50.0, 50.0),
+            stat_alpha: 0.0,
+            stat_fading_in: true,
+            selected_option: 0,
+
+            message_text: String::new(),
+            message_alpha: 0.0,
+            message_fading_in: true,
+            message_timer: 0.0,
+        }
+    }
+}
 
 pub struct GameState {
     pub scene: Scene,
     pub font: Font,
-    
+    pub texts: TextResources,
+
     pub system: SystemState,
     pub player: PlayerState,
     pub world: WorldState,
-    
+
     pub boot_state: crate::scenes::boot::BootState,
     pub menu_state: crate::scenes::menu::MenuState,
-    
+    pub game_over_state: GameOverState,
+
     // Transition
     pub transition_timer: f32,
     pub session_started: bool,
-    
-    // Timer to prevent immediate skipping of boot sequence
-    pub boot_grace_timer: f32,
 
     // Combat
     pub combat_data: CombatData,
@@ -38,11 +69,9 @@ pub struct GameState {
     pub fade_out: bool,
 }
 
-
-
 impl GameState {
     pub fn new(ctx: &mut Context) -> tetra::Result<GameState> {
-        // Try to load a font. 
+        // Try to load a font.
         let font_paths = [
             "resources/font.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
@@ -53,6 +82,7 @@ impl GameState {
 
         let mut font = None;
         for path in &font_paths {
+            #[allow(clippy::collapsible_if)]
             if std::path::Path::new(path).exists() {
                 if let Ok(f) = Font::vector(ctx, path, 16.0) {
                     font = Some(f);
@@ -63,56 +93,52 @@ impl GameState {
 
         let font = match font {
             Some(f) => f,
-            None => panic!("Could not find a suitable font! Please place 'font.ttf' in the 'resources' folder."),
+            None => panic!(
+                "Could not find a suitable font! Please place 'font.ttf' in the 'resources' folder."
+            ),
         };
 
         let mut boot_state = crate::scenes::boot::BootState::new();
-        boot_state.boot_lines.push("Starting VibeCoded Linux version 6.9.420...".to_string());
+        boot_state
+            .boot_lines
+            .push("Starting VibeCoded Linux version 6.9.420...".to_string());
         boot_state.boot_text_cache.push(None);
+
+        let mut world = WorldState::new();
+        // Initialize Gaster dialogues from texts
+        let texts = TextResources::new_turkish();
+        world.gaster_dialogues = texts.gaster_dialogues.clone();
+
+        let system = SystemState::new(ctx)?;
+        let mut menu_state = crate::scenes::menu::MenuState::new();
+
+        // If no users, default to Create Save
+        if system.users.is_empty() {
+            menu_state.selected_index = 1;
+        }
 
         Ok(GameState {
             scene: Scene::Boot,
             font,
+            texts,
 
-            system: SystemState::new(ctx)?,
+            system,
             player: PlayerState::new(),
-            world: WorldState::new(),
-            
+            world,
+
             boot_state,
-            menu_state: crate::scenes::menu::MenuState::new(),
-            
+            menu_state,
+            game_over_state: GameOverState::new(),
+
             transition_timer: 0.0,
             session_started: false,
-            boot_grace_timer: 0.0,
-            
+
             combat_data: CombatData::new(),
             heart_texture: None,
             bone_texture: None,
             fade_alpha: 0.0,
             fade_out: false,
         })
-    }
-
-    pub fn generate_kernel_panic(&mut self) {
-        self.system.generate_kernel_panic();
-    }
-
-    pub fn reset(&mut self) {
-        self.scene = Scene::Boot;
-        self.boot_state = crate::scenes::boot::BootState::new();
-        self.boot_state.boot_lines.push("Starting VibeCoded Linux version 6.9.420...".to_string());
-        self.boot_state.boot_text_cache.push(None);
-        
-        self.menu_state = crate::scenes::menu::MenuState::new();
-        
-        self.boot_grace_timer = 0.0;
-        self.session_started = false;
-        
-        // Reset Game State
-        self.player.health = 100.0;
-        self.world.current_stage = 1;
-        self.player.pos = Vec2::new(400.0, 300.0);
-        self.player.direction = Direction::Front;
     }
 
     pub fn assign_asset(&mut self, index: usize, asset: crate::assets::LoadedAsset) {
@@ -187,7 +213,8 @@ impl State for GameState {
             }
             Scene::TransitionToDesktop => {
                 self.transition_timer += 1.0;
-                if self.transition_timer > 120.0 { // 2 seconds fade
+                if self.transition_timer > 120.0 {
+                    // 2 seconds fade
                     self.scene = Scene::Desktop;
                 }
             }
@@ -210,8 +237,87 @@ impl State for GameState {
                 crate::scenes::combat::update(ctx, self)?;
             }
             Scene::KernelPanic => {
-                if input::is_key_pressed(ctx, Key::Enter) {
-                    self.reset();
+                // Update Stats Animation
+                let mut rng = rand::thread_rng();
+                if self.game_over_state.stat_fading_in {
+                    self.game_over_state.stat_alpha += 0.02;
+                    if self.game_over_state.stat_alpha >= 1.5 {
+                        // Go a bit over 1.0 for a pause
+                        self.game_over_state.stat_fading_in = false;
+                    }
+                } else {
+                    self.game_over_state.stat_alpha -= 0.02;
+                    if self.game_over_state.stat_alpha <= 0.0 {
+                        self.game_over_state.stat_fading_in = true;
+                        self.game_over_state.current_stat_index =
+                            (self.game_over_state.current_stat_index + 1) % 4; // 4 stats
+
+                        // Generate position avoiding the center box
+                        // Center Box: X: 150-650, Y: 150-450 (Approx)
+                        let pos;
+                        loop {
+                            let p = Vec2::new(
+                                rng.gen_range(50.0..SCREEN_WIDTH as f32 - 150.0),
+                                rng.gen_range(50.0..SCREEN_HEIGHT as f32 - 50.0),
+                            );
+
+                            let in_center_x = p.x > 150.0 && p.x < 650.0;
+                            let in_center_y = p.y > 150.0 && p.y < 450.0;
+
+                            if !(in_center_x && in_center_y) {
+                                pos = p;
+                                break;
+                            }
+                        }
+                        self.game_over_state.stat_pos = pos;
+                    }
+                }
+
+                // Update Dynamic Message Animation
+                if self.game_over_state.message_text.is_empty() {
+                    // Select message based on stats
+                    let teblig = if let Some(u) = &self.system.current_user {
+                        u.teblig_count
+                    } else {
+                        0
+                    };
+                    let tekfir = if let Some(u) = &self.system.current_user {
+                        u.tekfir_count
+                    } else {
+                        0
+                    };
+
+                    println!(
+                        "DEBUG: Game Over Stats - Teblig: {}, Tekfir: {}",
+                        teblig, tekfir
+                    );
+
+                    let messages = if teblig > tekfir {
+                        &self.texts.game_over_messages.teblig_high
+                    } else if tekfir > teblig {
+                        &self.texts.game_over_messages.tekfir_high
+                    } else {
+                        &self.texts.game_over_messages.equal
+                    };
+
+                    self.game_over_state.message_text =
+                        messages[rng.gen_range(0..messages.len())].clone();
+                }
+
+                if self.game_over_state.message_fading_in {
+                    self.game_over_state.message_alpha += 0.01;
+                    if self.game_over_state.message_alpha >= 1.0 {
+                        self.game_over_state.message_fading_in = false;
+                        self.game_over_state.message_timer = 2.0; // Hold for 2 seconds
+                    }
+                } else if self.game_over_state.message_timer > 0.0 {
+                    self.game_over_state.message_timer -= 0.016;
+                } else {
+                    self.game_over_state.message_alpha -= 0.01;
+                    if self.game_over_state.message_alpha <= 0.0 {
+                        self.game_over_state.message_fading_in = true;
+                        self.game_over_state.message_text.clear(); // Pick new message
+                    }
                 }
             }
             Scene::AyasofyaInside => {
@@ -237,32 +343,153 @@ impl State for GameState {
             Scene::CombatTransition => {
                 // Draw Desktop underneath
                 crate::scenes::desktop::draw(ctx, self)?;
-                
+
                 // Draw fade
-                let fade_rect = Mesh::rectangle(ctx, ShapeStyle::Fill, Rectangle::new(0.0, 0.0, SCREEN_WIDTH as f32, SCREEN_HEIGHT as f32)).unwrap();
-                fade_rect.draw(ctx, DrawParams::new().color(Color::rgba(0.0, 0.0, 0.0, self.fade_alpha)));
+                let fade_rect = Mesh::rectangle(
+                    ctx,
+                    ShapeStyle::Fill,
+                    Rectangle::new(0.0, 0.0, SCREEN_WIDTH as f32, SCREEN_HEIGHT as f32),
+                )
+                .unwrap();
+                fade_rect.draw(
+                    ctx,
+                    DrawParams::new().color(Color::rgba(0.0, 0.0, 0.0, self.fade_alpha)),
+                );
             }
             Scene::Combat => {
                 crate::scenes::combat::draw(ctx, self)?;
             }
             Scene::KernelPanic => {
                 graphics::clear(ctx, Color::BLACK);
-                
-                let mut y = 20.0;
-                for (i, line) in self.system.panic_report.iter().enumerate() {
-                    let mut text = Text::new(line, self.font.clone());
-                    
-                    // Make the "Press ENTER" line blink
-                    if i == self.system.panic_report.len() - 1 {
-                        // Simple blink using frame count or similar (simulated with random for now or just static)
-                        // Actually, let's just make it static for stability, or use a timer if we had one.
-                        // We can use `ctx.get_time().as_secs_f32()` if we want.
-                        // Let's just keep it white.
-                        text.draw(ctx, DrawParams::new().position(Vec2::new(20.0, y)).color(Color::WHITE));
+
+                // Draw Title
+                let title = &self.texts.ui.game_over_title;
+                let mut title_text = Text::new(title, self.font.clone());
+                let title_bounds = title_text.get_bounds(ctx).unwrap();
+                let title_scale = 2.0;
+                let title_width = title_bounds.width * title_scale;
+
+                title_text.draw(
+                    ctx,
+                    DrawParams::new()
+                        .position(Vec2::new((SCREEN_WIDTH as f32 - title_width) / 2.0, 200.0))
+                        .color(Color::RED)
+                        .scale(Vec2::new(title_scale, title_scale)),
+                );
+
+                // Draw Username
+                let username = if let Some(user) = &self.system.current_user {
+                    format!("{}{}", self.texts.ui.user_label, user.username)
+                } else {
+                    format!("{}Unknown", self.texts.ui.user_label)
+                };
+                let mut user_text = Text::new(username, self.font.clone());
+                let user_bounds = user_text.get_bounds(ctx).unwrap();
+                user_text.draw(
+                    ctx,
+                    DrawParams::new()
+                        .position(Vec2::new(
+                            (SCREEN_WIDTH as f32 - user_bounds.width) / 2.0,
+                            260.0,
+                        ))
+                        .color(Color::WHITE),
+                );
+
+                // Draw Dynamic Message
+                if !self.game_over_state.message_text.is_empty() {
+                    let mut msg_text =
+                        Text::new(&self.game_over_state.message_text, self.font.clone());
+                    let msg_bounds = msg_text.get_bounds(ctx).unwrap();
+                    msg_text.draw(
+                        ctx,
+                        DrawParams::new()
+                            .position(Vec2::new(
+                                (SCREEN_WIDTH as f32 - msg_bounds.width) / 2.0,
+                                300.0,
+                            ))
+                            .color(Color::rgba(
+                                1.0,
+                                0.0,
+                                0.0,
+                                self.game_over_state.message_alpha,
+                            )), // Red flashing
+                    );
+                }
+
+                // Draw Stats (Randomly appearing)
+                let stats = [
+                    format!(
+                        "Teblig: {}",
+                        if let Some(u) = &self.system.current_user {
+                            u.teblig_count
+                        } else {
+                            0
+                        }
+                    ),
+                    format!(
+                        "Cihad: {}",
+                        if let Some(u) = &self.system.current_user {
+                            u.cihad_count
+                        } else {
+                            0
+                        }
+                    ),
+                    format!(
+                        "Tekfir: {}",
+                        if let Some(u) = &self.system.current_user {
+                            u.tekfir_count
+                        } else {
+                            0
+                        }
+                    ),
+                    format!(
+                        "Stage: {}",
+                        if let Some(u) = &self.system.current_user {
+                            u.current_stage
+                        } else {
+                            1
+                        }
+                    ),
+                ];
+
+                if self.game_over_state.current_stat_index < stats.len() {
+                    let mut stat_text = Text::new(
+                        &stats[self.game_over_state.current_stat_index],
+                        self.font.clone(),
+                    );
+                    stat_text.draw(
+                        ctx,
+                        DrawParams::new()
+                            .position(self.game_over_state.stat_pos)
+                            .color(Color::rgba(
+                                1.0,
+                                1.0,
+                                1.0,
+                                self.game_over_state.stat_alpha.min(1.0),
+                            )),
+                    );
+                }
+
+                // Draw Options
+                let options = [&self.texts.ui.return_menu, &self.texts.ui.quit_game];
+                let total_width = 400.0; // Approximate width for both options
+                let start_x = (SCREEN_WIDTH as f32 - total_width) / 2.0;
+
+                let mut x_offset = start_x;
+                for (i, opt) in options.iter().enumerate() {
+                    let color = if i == self.game_over_state.selected_option {
+                        Color::rgb(1.0, 1.0, 0.0) // Yellow
                     } else {
-                        text.draw(ctx, DrawParams::new().position(Vec2::new(20.0, y)).color(Color::WHITE));
-                    }
-                    y += 20.0;
+                        Color::rgb(0.5, 0.5, 0.5) // Gray
+                    };
+                    let mut text = Text::new(*opt, self.font.clone());
+                    text.draw(
+                        ctx,
+                        DrawParams::new()
+                            .position(Vec2::new(x_offset, 400.0))
+                            .color(color),
+                    );
+                    x_offset += 250.0; // Spacing
                 }
             }
             Scene::AyasofyaInside => {

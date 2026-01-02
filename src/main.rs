@@ -1,17 +1,18 @@
-mod defs;
-mod combat;
-mod game_state;
-mod scenes;
 mod assets;
-mod player;
-mod world;
-mod system;
+mod combat;
+mod defs;
+mod game_state;
 mod input_handler;
 mod physics;
+mod player;
+mod scenes;
+mod system;
+mod texts;
+mod world;
 
-use tetra::ContextBuilder;
-use crate::defs::{SCREEN_WIDTH, SCREEN_HEIGHT};
+use crate::defs::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::game_state::GameState;
+use tetra::ContextBuilder;
 
 fn main() -> tetra::Result {
     ContextBuilder::new("Gorkitale", SCREEN_WIDTH, SCREEN_HEIGHT)

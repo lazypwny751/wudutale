@@ -1,11 +1,11 @@
-use tetra::graphics::{Color, Texture};
 use tetra::audio::{Sound, SoundInstance};
+use tetra::graphics::{Color, Texture};
 use tetra::math::Vec2;
 
 pub struct WorldState {
     pub current_stage: u8,
     pub bg_texture: Option<Texture>,
-    
+
     // Gaster
     pub gaster_pos: Vec2<f32>,
     pub gaster_talking: bool,
@@ -53,18 +53,10 @@ impl WorldState {
         Self {
             current_stage: 1,
             bg_texture: None,
-            
+
             gaster_pos: Vec2::new(600.0, 300.0),
             gaster_talking: false,
-            gaster_dialogues: vec![
-                "çakar çakmaz çakan çakmak...".to_string(),
-                "Beware the man who speaks in hands...".to_string(),
-                "Dark, darker, yet darker...".to_string(),
-                "The shadows cutting deeper...".to_string(),
-                "Photon readings negative...".to_string(),
-                "This next experiment seems very, very interesting...".to_string(),
-                "What do you two think?".to_string(),
-            ],
+            gaster_dialogues: Vec::new(),
             current_gaster_dialogue: String::new(),
             npc_gaster_standing: None,
             npc_gaster_talking: None,

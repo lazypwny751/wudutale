@@ -3,12 +3,12 @@ use tetra::graphics::{self, Color, DrawParams};
 use tetra::input::{self, Key};
 use tetra::math::Vec2;
 
+use crate::defs::{SCREEN_HEIGHT, SCREEN_WIDTH, Scene};
 use crate::game_state::GameState;
-use crate::defs::{Scene, SCREEN_WIDTH, SCREEN_HEIGHT};
 
 pub fn update(ctx: &mut Context, state: &mut GameState) -> tetra::Result {
     let speed = 2.0;
-    
+
     // Movement (Simple left/right/up/down)
     if input::is_key_down(ctx, Key::W) || input::is_key_down(ctx, Key::Up) {
         state.player.pos.y -= speed;
@@ -24,8 +24,12 @@ pub fn update(ctx: &mut Context, state: &mut GameState) -> tetra::Result {
     }
 
     // Boundaries
-    if state.player.pos.y < 150.0 { state.player.pos.y = 150.0; }
-    if state.player.pos.y > SCREEN_HEIGHT as f32 - 50.0 { state.player.pos.y = SCREEN_HEIGHT as f32 - 50.0; }
+    if state.player.pos.y < 150.0 {
+        state.player.pos.y = 150.0;
+    }
+    if state.player.pos.y > SCREEN_HEIGHT as f32 - 50.0 {
+        state.player.pos.y = SCREEN_HEIGHT as f32 - 50.0;
+    }
     // Removed right boundary clamp to allow exit
 
     // Exit Logic (Left side)
@@ -66,10 +70,12 @@ pub fn draw(ctx: &mut Context, state: &mut GameState) -> tetra::Result {
         let bg_height = texture.height() as f32;
         let scale_x = SCREEN_WIDTH as f32 / bg_width;
         let scale_y = SCREEN_HEIGHT as f32 / bg_height;
-        
-        texture.draw(ctx, DrawParams::new()
-            .position(Vec2::new(0.0, 0.0))
-            .scale(Vec2::new(scale_x, scale_y))
+
+        texture.draw(
+            ctx,
+            DrawParams::new()
+                .position(Vec2::new(0.0, 0.0))
+                .scale(Vec2::new(scale_x, scale_y)),
         );
     }
 
@@ -84,11 +90,13 @@ pub fn draw(ctx: &mut Context, state: &mut GameState) -> tetra::Result {
         let width = texture.width() as f32;
         let height = texture.height() as f32;
         let origin = Vec2::new(width / 2.0, height / 2.0);
-        
-        texture.draw(ctx, DrawParams::new()
-            .position(state.player.pos)
-            .origin(origin)
-            .scale(Vec2::new(4.0, 4.0))
+
+        texture.draw(
+            ctx,
+            DrawParams::new()
+                .position(state.player.pos)
+                .origin(origin)
+                .scale(Vec2::new(4.0, 4.0)),
         );
     }
 
