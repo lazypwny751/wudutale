@@ -70,8 +70,30 @@ jobs:
           name: windows-release
           path: releases/*.zip
 
+  build-book:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install LaTeX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y texlive-latex-base texlive-latex-extra texlive-lang-european
+      - name: Build Book
+        run: |
+          make -C docs/the_lore
+          
+          VERSION=${GITHUB_REF_NAME#v}
+          mkdir the_book
+          cp docs/the_lore/tr/main.pdf the_book/gorkitale_v${VERSION}-tr.pdf
+          cp docs/the_lore/en/main.pdf the_book/gorkitale_v${VERSION}-en.pdf
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: book-pdfs
+          path: the_book/*.pdf
+
   release:
-    needs: [build-linux, build-windows]
+    needs: [build-linux, build-windows, build-book]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -85,3 +107,4 @@ jobs:
           files: |
             artifacts/linux-release/*.tar.gz
             artifacts/windows-release/*.zip
+            artifacts/book-pdfs/*.pdf
