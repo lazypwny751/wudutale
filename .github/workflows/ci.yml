@@ -1,0 +1,27 @@
+name: Godot CI (4.5.1 Mono Headless)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Godot CI Export (Mono)
+        uses: barichello/godot-ci@v4
+        with:
+          godot-version: 4.5.1
+          mono: true
+          export-templates: true
+
+      - name: Upload builds
+        uses: actions/upload-artifact@v3
+        with:
+          name: godot-builds
+          path: build/
