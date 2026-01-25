@@ -1,7 +1,7 @@
 GODOT := godot
 
 LINUX_PRESET := "Linux"
-WINDOWS_PRESET := "Windows"
+WINDOWS_PRESET := "Windows Desktop"
 
 BUILD_DIR := "build"
 
