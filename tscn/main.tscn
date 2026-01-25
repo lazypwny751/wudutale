@@ -6,6 +6,14 @@
 
 [node name="FSM" type="Node" parent="."]
 
+[node name="Audio" type="Node" parent="."]
+
+[node name="RadioPlayer" type="AudioStreamPlayer" parent="Audio"]
+
+[node name="SFXPlayer" type="AudioStreamPlayer" parent="Audio"]
+
+[node name="UISounds" type="AudioStreamPlayer" parent="Audio"]
+
 [node name="World" type="Node2D" parent="."]
 
 [node name="UI" type="CanvasLayer" parent="."]
